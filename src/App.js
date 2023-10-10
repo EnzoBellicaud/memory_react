@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, ScrollView, TouchableOpacity } from 'react-native';
+import React, {useState } from 'react';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
+import { Pressable } from 'react-native-web';
 
 const App = () => {
-  const [pairs, setPairs] = useState('4');
-  const [timer, setTimer] = useState('60');
-  const [unlimited, setUnlimited] = useState(false);
-  const [score, setScore] = useState(0);
+  const [pairs, setPairs] = useState('5');
+  const [scores, setScore] = useState([]);
   const [cards, setCards] = useState([]);
   const [flippedCards, setFlippedCards] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
+  const [fin, setFin] = useState(true);
+  const [players, setPlayers] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState(0);
 
   const createCards = (pairs) => {
     const cardValues = [];
     const cardColors = [];
-    
+
     for (let i = 1; i <= pairs; i++) {
       cardValues.push(i.toString(), i.toString());
       cardColors.push(`hsl(${Math.random() * 360}, 100%, 50%)`);
     }
-    
+
     const shuffledValues = shuffle(cardValues);
     const newCards = shuffledValues.map((value, index) => ({
       id: index,
@@ -26,7 +27,7 @@ const App = () => {
       param: cardColors[parseInt(value) - 1],
       flipped: false,
     }));
-    
+
     setCards(newCards);
     setFlippedCards([]);
   };
@@ -47,7 +48,11 @@ const App = () => {
       if (flippedCards.length === 1) {
         const [card1] = flippedCards;
         if (card1.value === card.value) {
-          setScore(score + 10);
+          setScore((prevScore) => {
+            const newScore = [...prevScore];
+            newScore[currentPlayer] += 10;
+            return newScore;
+          });
           setFlippedCards([]);
         } else {
           setTimeout(() => {
@@ -56,65 +61,117 @@ const App = () => {
             setFlippedCards([]);
           }, 1000);
         }
+        if (cards.every((card) => card.flipped)) {
+          setFin(true);
+        }
+        setCurrentPlayer((currentPlayer + 1) % players.length);
       }
     }
   };
 
+  
+
+
+
   const startGame = () => {
     createCards(parseInt(pairs));
-    setScore(0);
-    setGameOver(false);
+    if (players.length === 0) {
+      setPlayers(['Player 1']);
+      setScore([0]);
+    } else {
+      players.map((player, index) => {
+        if (player === '') {
+          players[index] = 'Player ' + (index + 1);
+          scores[index] = 0;
+        }
+      });
+    };
+    setFin(false);
   };
+
+  const endGame = () => {
+    setFin(true);
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Memory Game</Text>
-      {gameOver ? (
-        <Text style={styles.gameOver}>Game Over! Your score is {score}.</Text>
-      ) : (
-        <>
-          <View style={styles.form}>
-            <Text style={styles.label}>Number of pairs:</Text>
-            <TextInput
-              style={styles.input}
-              value={pairs}
-              onChangeText={setPairs}
-              keyboardType="numeric"
-            />
-            <Text style={styles.label}>Timer duration (in seconds):</Text>
-            <TextInput
-              style={styles.input}
-              value={timer}
-              onChangeText={setTimer}
-              keyboardType="numeric"
-            />
-            <Text style={styles.label}>Unlimited time:</Text>
-            <TouchableOpacity onPress={() => setUnlimited(!unlimited)}>
-              <View style={styles.checkbox}>
-                {unlimited && <View style={styles.checkedBox} />}
-              </View>
-            </TouchableOpacity>
-          </View>
-          <Button title="Start Game" onPress={startGame} />
-          <ScrollView style={styles.memoryGrid} contentContainerStyle={{flex: 1, flexDirection: "row", flexWrap: "wrap"}}>
-            {cards.map((card) => (
-              <TouchableOpacity
-                key={card.id}
-                style={[
-                  styles.card,
-                  { backgroundColor: card.flipped ? card.param : '#ccc' },
-                ]}
-                onPress={() => flipCard(card)}
-              >
-                <Text style={{ color: card.flipped ? '#000' : '#ccc' }}>
-                  {card.flipped ? card.value : ''}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <Text style={styles.score}>Score: {score}</Text>
-        </>
-      )}
+      <View style={styles.form}>
+
+        <Text style={styles.label}>Number of pairs:</Text>
+        <TextInput
+          style={styles.input}
+          value={pairs}
+          onChangeText={setPairs}
+          inputMode="numeric"
+        />
+
+        <Text style={styles.label}>Players:</Text>
+        {players.map((player, index) => (
+          <TextInput
+            key={index}
+            style={styles.input}
+            value={player}
+            onChangeText={(text) => {
+              const newPlayers = [...players];
+              newPlayers[index] = text;
+              setPlayers(newPlayers);
+            }}
+          />
+        ))}
+
+        <Pressable style={({ pressed }) => pressed ? [styles.pressable, styles.pressed] : styles.pressable}
+          onPress={() => {
+            setPlayers([...players, '']);
+            endGame()
+          }}>
+          <Text style={styles.buttonText}>Add Player</Text>
+        </Pressable>
+
+        <Pressable style={({ pressed }) => pressed ? [styles.pressable, styles.pressed] : styles.pressable}
+          onPress={() => {
+            setPlayers([...players.slice(0, -1)]);
+            endGame()
+          }}
+          disabled={players.length === 0}>
+          <Text style={styles.buttonText}>Delete Player</Text>
+        </Pressable>
+      </View>
+
+      <Pressable style={({ pressed }) => pressed ? [styles.pressable, styles.pressed] : styles.pressable}
+        onPress={startGame}>
+        <Text style={styles.buttonText}>Start Game</Text>
+      </Pressable>
+
+      {fin ?
+        (<Text style={styles.gameOver}>Fini !</Text>) : (
+          <>
+            <Text style={styles.score}>Current Player: {players[currentPlayer]}</Text>
+            <ScrollView style={styles.memoryGrid} contentContainerStyle={{ flex: 1, flexDirection: "row", flexWrap: "wrap" }}>
+              {cards.map((card) => (
+                <TouchableOpacity
+                  key={card.id}
+                  style={[styles.card, { backgroundColor: card.flipped ? card.param : '#ccc' }]}
+                  onPress={() => flipCard(card)}
+                >
+                  <Text style={{ color: card.flipped ? '#000' : '#ccc' }}>
+                    {card.flipped ? card.value : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+      <Text style={styles.score}>Score:</Text>
+      {
+        scores.map((playerScore, index) => (
+          <Text key={index} style={styles.score}>
+            {players[index]}: {playerScore}
+          </Text>
+        ))
+
+      }
     </View>
   );
 };
@@ -168,7 +225,7 @@ const styles = StyleSheet.create({
   },
   memoryGrid: {
     margin: 20,
-    },
+  },
   card: {
     width: 100,
     height: 100,
@@ -191,6 +248,26 @@ const styles = StyleSheet.create({
     margin: 20,
     textAlign: 'center',
   },
+  pressable: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    backgroundColor: '#3498fa', // Couleur par défaut
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    marginLeft: 10,
+  },
+
+  pressed: {
+    backgroundColor: '#2980b9', // Couleur lorsqu'appuyé
+  },
+
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+
 });
 
 export default App;
